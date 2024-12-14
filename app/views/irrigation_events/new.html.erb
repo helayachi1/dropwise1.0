@@ -1,0 +1,20 @@
+<div class="page_title">
+	<h1 class="main_title">New Task</h1>	
+</div>
+<%= form_with model: @irrigation_event do |form| %>
+	
+	<div class="field">
+		<%= form.label :zone_id %>
+		<%= form.collection_select :zone_id, Zone.all, :id, :name, prompt: "Select a zone" %>
+	</div>
+
+	<div class="field">
+		<%= form.label :duration %>
+		<%= form.number_field :duration, min: 1 %>
+	</div>
+
+	<div class="action">
+		<%= form.submit 'Start Now ->' %>
+	</div>
+
+<% end %>

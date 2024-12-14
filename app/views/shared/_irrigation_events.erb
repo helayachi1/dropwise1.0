@@ -1,0 +1,22 @@
+<div class="history_section">
+  <div class="section_header">
+    <h2 class="section_title">History</h2>
+    <a class="all_history_link" href="<%= history_path %>">All History →</a>
+  </div>
+
+
+
+<div class="history_list">
+  <% if @irrigation_events.size > 0 %>
+    <% @irrigation_events.last(2).reverse.each do |e| %>
+      <div class="history_item">
+        <div class="zone_details">
+          <p class="zone_name">Zone <%= e.zone_id %></p>
+        </div>
+        <p class="duration">Duration: <%= e.duration %> min</p>
+      </div>
+    <% end %>
+  <% else %>
+<p>No irrigation events yet. <%= link_to 'Start a new irrigation', new_irrigation_path %>.</p>
+  <% end %>
+</div>

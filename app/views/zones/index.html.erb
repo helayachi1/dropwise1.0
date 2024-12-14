@@ -1,0 +1,7 @@
+<h1>Zones#index</h1>
+<p>Find me in app/views/zones/index.html.erb</p>
+
+<% @zones.each do |zone| %>
+	<h1><%= zone.name %></h1>
+	<p><%= zone.status %></p>
+<% end %>

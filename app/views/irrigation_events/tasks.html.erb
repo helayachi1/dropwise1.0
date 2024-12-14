@@ -1,0 +1,30 @@
+<div class="page_title">
+	<h1 class="main_title">Irrigation Tasks</h1>	
+</div>
+
+<h2>On going (<%=  @ongoing_events.size %>) </h2>
+
+<div class="ongoing_events">
+	<% @ongoing_events.each do |e| %>
+	<div class="ongoing_event">
+		<div class="ongoing_event_info">
+			<p>Zone <%= e.zone_id %></p>
+			<p> <span style="color: #9c9c9c; font-weight: 400;"> Time left : </span> <%= e.duration %> min</p>
+		</div>
+	</div>
+	<% end %>
+</div>
+
+<h2>Completed (<%=  @completed_events.size %>)</h2>
+
+<div class="completed_events">
+	<% @completed_events.each do |e| %>
+	<div class="completed_event">
+		<div class="completed_event_info">
+			<p>Zone <%= e.zone_id %></p>
+			<p> <span style="color: #9c9c9c; font-weight: 400;"> Duration : </span> <%= e.duration %> min</p>
+			<p><%= e.created_at.strftime("%A, %B %d %H:%M") %></p>
+		</div>
+	</div>
+	<% end %>
+</div>

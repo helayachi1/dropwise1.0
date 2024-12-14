@@ -1,4 +1,24 @@
-# dropwise1.0
+# README
 
+This README would normally document whatever steps are necessary to get the
+application up and running.
 
-This project is a simple and efficient Smart Irrigation System built as part of my final-year engineering project. The system uses an ESP32 microcontroller to control irrigation zones based on environmental data such as temperature, humidity, and water level readings.
+Things you may want to cover:
+
+* Ruby version
+
+* System dependencies
+
+* Configuration
+
+* Database creation
+
+* Database initialization
+
+* How to run the test suite
+
+* Services (job queues, cache servers, search engines, etc.)
+
+* Deployment instructions
+
+* ...
