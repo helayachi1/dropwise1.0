@@ -1,19 +1,19 @@
 // DROPWISE APP | Made with love by Elayachi Hamrit 2025.
 
-
+// LIBS 
 #include <Wire.h>
 #include <WiFi.h>
 #include <DHT.h>
 #include <LiquidCrystal_I2C.h>
 #include "ESPAsyncWebServer.h"
+#include <TaskScheduler.h>
 
 // Pin definitions
 const int RELY_1_PIN = 13; // ZONE 1
 const int RELY_2_PIN = 12; // ZONE 2
 const int RELY_3_PIN = 14; // ZONE 3 
 const int RELY_4_PIN = 27; // WATER FILLING PUMP
-
-const int WATER_LEVEL_SENSORE_PIN = 34;
+const int WATER_LEVEL_SENSORE_PIN = 34; 
 const int BUZZER_PIN = 5;
 const int DHT11_SENSORE_PIN = 4;
 const int BUILT_IN_LED = 2;
@@ -35,7 +35,11 @@ const char* wifi_pass = "1234512345";
 String wifi_rssi;  
 String wifi_ip;
 String wifi_status;
+
+// Enable buzzer of it's true
 bool AlarmAllowed = true;
+
+// Enable auto water filling of it's true!
 bool AutoWaterFillingAllowed = true;
 
 // Create web server object on port 80;
@@ -46,7 +50,7 @@ LiquidCrystal_I2C lcd(0x27, 16, 2); // 16x2 LCD
 DHT dht(DHT11_SENSORE_PIN, DHT11);  // DHT sensor setup
 
 // APP 
-const char index_html[] PROGMEM = R"rawliteral(
+const char dropwise_app[] PROGMEM = R"rawliteral(
 <!DOCTYPE HTML>
 <html lang="en">
 
@@ -65,6 +69,48 @@ const char index_html[] PROGMEM = R"rawliteral(
             font-family: "Poppins", sans-serif;
             scroll-behavior: smooth;
         }
+                /* For webkit browsers like Chrome, Safari */
+                ::-webkit-scrollbar {
+                    height: 2px; /* Set the height of the horizontal scrollbar */
+                }
+
+                ::-webkit-scrollbar-track {
+                    background: #f1f1f1; /* Background color of the track (area the thumb moves along) */
+                }
+
+                ::-webkit-scrollbar-thumb {
+                    background: #888; /* Color of the draggable thumb */
+                    border-radius: 2px; /* Round the corners of the thumb */
+                }
+
+                ::-webkit-scrollbar-thumb:hover {
+                    background: #555; /* Change the thumb color when hovering */
+                }
+
+                /* Apply the custom scrollbar to an element with class .scroll-container */
+.scroll-container {
+    overflow-x: scroll; /* Enable horizontal scrolling */
+    width: 100%; /* Set the width to allow scrolling */
+    height: 100px; /* Set a fixed height */
+}
+
+/* Now apply the scrollbar styles */
+.scroll-container::-webkit-scrollbar {
+    height: 2px; /* Custom height for horizontal scrollbar */
+}
+
+.scroll-container::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+.scroll-container::-webkit-scrollbar-thumb {
+    background: none;
+    border-radius: 10px;
+}
+
+.scroll-container::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
 
         body {
             background-color: #f9f9f9;
@@ -72,7 +118,6 @@ const char index_html[] PROGMEM = R"rawliteral(
 
         h2 {
             font-weight: 500;
-            padding-top: 1rem;
             font-size: 1.2rem;
             color: #696868;
         }
@@ -86,19 +131,96 @@ const char index_html[] PROGMEM = R"rawliteral(
             display: grid;
             max-width: 1200px;
             margin: 0 auto;
-            grid-template-columns: clamp(1rem, 4vw, 3rem) 1fr clamp(1rem, 4vw, 3rem) ;
-            grid-template-areas: ". navbar ."
+            grid-template-columns: 3vw 1fr 3vw;
+            grid-template-areas: 
+
+                                ". navbar ."
+                                ". network_details_header ."
+                                ". connections ."
+                                ". env_infos_header ."
                                  ". env ."
-                                 ". connections ."
+                                 ". sensores_header ."
+                                 ". sensors ."
+                                 ". system-health-header ."
                                  ". health ."
-                                " . sensors ."
-                                ". controllers .";
+                                 ". schuduling_header ."
+                                 ". scheduler_wrapper ."
+                                 ". activation_header ."
+                                 ". controllers .";
 
             gap: 1rem;
             padding-bottom: 2rem;
+        }   
+
+        .header {
+            background-color: red;
+            display: flex;
+            align-items: center;
+            background-color: #fbfbfb;
+            border-left: 10px solid #9376ed;
+            padding: 1rem 2rem;
         }
+
+        .activation_header {
+            grid-area: activation_header;
+        }
+
+        .schuduling_header {
+            grid-area: schuduling_header;
+        }
+
+        .system-health-header {
+            grid-area: system-health-header;
+        }
+
+       .sensores_header {
+        grid-area: sensores_header;
+       }
         
 
+        .env_infos_header {
+            grid-area: env_infos_header;
+        }
+
+        .network_details_header {
+            grid-area: network_details_header;
+        }
+
+        .scheduler_wrapper {
+            grid-area: scheduler_wrapper;
+            background-color: #fff;
+            padding: 2rem;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1rem;                    
+        }
+
+        .SelectorWrapper {
+            background-color: #fbfbfb;
+            padding: 1rem 1rem;
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        #scheduler_submit {
+            justify-self: self-end;           
+        }
+
+         select, input {
+            width: 150px;
+            outline: none;
+            border: none;
+            color: #9376ed;
+            font-size: 1.1rem;
+            background: none;
+            border-bottom: 1px solid #9376ed;
+        }
+        
+        label {
+            font-weight: 500;
+        }
+        
         .brand {
             padding: 2rem;
             color: #383636;
@@ -109,12 +231,11 @@ const char index_html[] PROGMEM = R"rawliteral(
             justify-content: space-between;
             align-items: center;
             grid-area: navbar;
-            padding: 1rem 0rem;
+            padding: 2rem 0rem;
             position: sticky;
             width: 100%;
             top: 0;
             background-color: #f9f9f9;
-
         }        
 
         .menu {
@@ -130,17 +251,18 @@ const char index_html[] PROGMEM = R"rawliteral(
         .link:hover {
             color: #4da9f6;
         }
+
     
 .device-status {
     display: flex;
+
     padding: 1rem;
     overflow: hidden;
     flex-wrap: wrap;
     justify-content: space-between; /* Distribute child elements evenly */
     width: 100%; /* Make sure it uses the full available width */
     background-color: #fbfbfb;
-    border-radius: 8px;
-}
+    }
 
 .device-status p {
     flex: 1; /* This ensures that the content inside each status element fills available space */
@@ -148,25 +270,19 @@ const char index_html[] PROGMEM = R"rawliteral(
 }
 
 .fa-solid {
-    padding-right: 0.7rem;
+    padding-right: 0.2rem;
 }
-
+    
 .system-health-wrapper {
     background-color: #fff;
     padding: 2rem;
-    border-radius: 12px;
+    
     display: flex;
     flex-direction: column;
     gap: 1rem;
     background-color: #fff;
     grid-area: health;
 
-}
-
-
-.system-health-actions {
-    display: flex;
-    justify-content: end;
 }
 
 
@@ -184,38 +300,35 @@ const char index_html[] PROGMEM = R"rawliteral(
         color: #8e8ed7;
     }
         
-
         .connection_info {
             display: flex;
-            flex-wrap: wrap;
-            gap: 1rem;
+            flex-wrap: nowrap;
+            gap: 0.5rem;
             justify-content: space-between;
             align-items: center;
-            padding: 2rem 2rem;
+            padding: 1rem;
             font-size: 0.9rem;
             background-color: #ffffff;
-            border-radius: 12px;
+             top: 6REM;
             grid-area: connections;
-
+              overflow-x: auto;   /* Enable horizontal scrolling */
+           
 
         }
 
         .connection_info .info {
             display: flex;
-            flex-wrap: wrap;
-            flex-grow: 1;
             align-items: center;
-            gap: 1rem;
+            flex-grow: 1;
+            gap: 0.5rem;
             background-color: #fbfbfb;
             padding: 1rem;
-            border-radius: 12px;
+            width: fit-content;      
         }
 
         svg {
             height: 20px;
         }
-
-
 
         .controlers {
             display: grid;
@@ -227,7 +340,7 @@ const char index_html[] PROGMEM = R"rawliteral(
         .controler_card {
             padding: 1rem;
             background-color: #ffffff;
-            border-radius: 12px;
+            
         }
 
         .info {
@@ -236,7 +349,7 @@ const char index_html[] PROGMEM = R"rawliteral(
             align-items: center;
             background-color: #fbfbfb;
             padding: 1rem;
-            border-radius: 12px;
+            
         }
 
 
@@ -249,19 +362,18 @@ const char index_html[] PROGMEM = R"rawliteral(
         .env_infos {
             display: grid;
             grid-template-columns: repeat(auto-fit,  minmax(200px, 1fr));
-            gap: 1.2rem;
+            gap: 1rem;
             background-color: #fff;
-            border-radius: 12px;
+            
             grid-area: env;
             padding: 1rem;
         }     
 
-        
-
+    
         .controler_card {
             padding: 1rem 2rem;
             background-color: #ffffff;
-            border-radius: 12px;
+            
         }
 
         .controler_info {
@@ -288,6 +400,7 @@ const char index_html[] PROGMEM = R"rawliteral(
                 transition: color 0.5s ease, background-color 0.5s ease; /* Smooth transition */
         }
 
+        
         .controler_switches {
             margin-top: 1rem;
         }
@@ -295,7 +408,7 @@ const char index_html[] PROGMEM = R"rawliteral(
         .switch-btn {
             padding: 0.8rem 2rem;
             width: 100px;
-            border-radius: 12px;
+            
             border: none;
             cursor: pointer;
             width: 100%;
@@ -303,6 +416,11 @@ const char index_html[] PROGMEM = R"rawliteral(
             color: #fff;
             background-color: #9376ed;
         }
+
+        input::placeholder {
+            color: #b5b4b4;
+        }
+
 
        .sensors_container {
             display: grid;
@@ -315,8 +433,10 @@ const char index_html[] PROGMEM = R"rawliteral(
         background-color: #fff;
         padding: 2rem;
         overflow: hidden;
-        border-radius: 12px;
+        
        }
+
+       
 
        .sensore_card_value, .sensore_card_ {
         font-size: 5rem;
@@ -329,6 +449,10 @@ const char index_html[] PROGMEM = R"rawliteral(
         gap: 0.4rem;
        }
 
+       label {
+        font-size: 1.3rem;
+        color: #696868;
+       }
 
        .sensore_card_unite {
         font-size: 5rem;
@@ -348,17 +472,14 @@ const char index_html[] PROGMEM = R"rawliteral(
 
             <div class="menu">
                 <a class="link " href="facebook.com/dropwise"></i>Follow us</a>  
-                <a class="link aboutlink" href="mailto:iamelayachi.h@gmail.com"></i>Contact</a> 
- 
             </div>
-
-           
         </div>
 
- <div class="env_infos">
+        <div class="header env_infos_header">
+            <h2>Environmental Information</h2>
+        </div>
 
-                
-
+ <div class="env_infos scroll-container">
                 <div class="info">
                 <i class="fa-solid fa-sun"></i>
                     <p class="info_title">Temperature</p>
@@ -372,13 +493,14 @@ const char index_html[] PROGMEM = R"rawliteral(
                 </div>
 
             </div>
+
+
+        <div class="header network_details_header">
+            <h2>Network Details</h2>
+        </div>
        
          <div class="connection_info">
-
-            <div class="info connection_location">
-                <i class="fa-solid fa-location-dot"></i>
-                <p id="location">Algeria, Setif</p>
-            </div>
+           
 
             <div class="info connection_ssid">
                 <i class="fa-solid fa-wifi"></i>
@@ -388,9 +510,10 @@ const char index_html[] PROGMEM = R"rawliteral(
             <div class="info connection_rssi">
                 <i class="fa-solid fa-signal"></i>
                 <p id="wifi_rssi">{{W_RSSI}}</p><span> db/ms</span>
+                <span class="wifi_signal"></span>
+
 
             </div>
-
 
             <div class="info connection_ip">
                 <i class="fa-solid fa-network-wired"></i>
@@ -398,8 +521,9 @@ const char index_html[] PROGMEM = R"rawliteral(
             </div>
         </div>
 
-
-
+        <div class="header system-health-header">
+            <h2>System Overview</h2>
+        </div>
 
     <div class="system-health-wrapper">        
 
@@ -427,6 +551,10 @@ const char index_html[] PROGMEM = R"rawliteral(
                
     </div>  
                 
+            <div class="header sensores_header">
+            <h2>Sensor Readings</h2>
+        </div>
+
 
         <div class="sensors_container">
 
@@ -438,12 +566,38 @@ const char index_html[] PROGMEM = R"rawliteral(
                 </div>
         </div>
 
-
         </div>
 
 
-<div class="controlers">
+        <div class="header schuduling_header">
+            <h2>Irrigation Scheduling</h2>
+        </div>
 
+
+           <form class="scheduler_wrapper" method="GET" action="/schedule_arrigation">
+    <div class="SelectorWrapper">
+        <label for="zoneSelectorList">Select Zone</label>
+        <select id="zoneSelectorList" name="zone">
+            <option value="1">Zone 1</option>
+            <option value="2">Zone 2</option>
+            <option value="3">Zone 3</option>
+        </select>
+    </div>
+
+    <div class="SelectorWrapper">
+        <label for="timeSelectorInput">Duration</label>
+        <input required id="timeSelectorInput" type="number" name="duration" placeholder="in seconds">
+    </div>
+
+    <button id="scheduler_button" class="switch-btn" type="submit">Press to set timer</button>
+</form>
+
+ <div class="header activation_header">
+            <h2>Zone Activation  </h2>
+    </div>
+
+
+<div class="controlers">
             <div class="controler_card">
                 <div class="controler_info">
                     <p class="controler_zone_name">Zone 1</p>
@@ -475,8 +629,7 @@ const char index_html[] PROGMEM = R"rawliteral(
                 <div class="controler_switches">
                     <button id="zone3RelayButton" class="switch-btn " data-state="off">Press to start</button>
                 </div>
-            </div>
-
+             </div>
 
             <div class="controler_card">
                 <div class="controler_info">
@@ -498,6 +651,7 @@ const char index_html[] PROGMEM = R"rawliteral(
             </div>
        
 </div>
+
     </div>
 
 <script type="text/javascript">
@@ -510,17 +664,60 @@ window.onload = function () {
             let zone3RelayController = document.getElementById("zone3RelayButton");
             let alarmController = document.getElementById("alarmButton");
             let waterFillingController = document.getElementById("waterFillingButton");
-            let nowDate = document.getElementById('.date');
+            
             // Relay Status 
-
             let zone1RelayStatus = document.getElementById('rely1Status');
             let zone2RelayStatus = document.getElementById('rely2Status');
             let zone3RelayStatus = document.getElementById('rely3Status');
             let autoWaterFillingStatus = document.getElementById('rely4Status');
+            let schedulerButton = document.getElementById('scheduler_button');
 
-      
+            schedulerButton.addEventListener('click', (event) => {
 
+                let rssiValue = document.getElementById('wifi_rssi').innerText.trim();
+                let wifiSignalStatus = document.querySelector('.wifi_signal').innerText;
+                             
+                if (rssiValue === "-30") {
+                    wifiSignalStatus.style.color = 'green';  // Excellent signal
+                    wifiSignalStatus.innerText = 'Excellent Signal';
+                } else if (rssiValue === "-40") {
+                    wifiSignalStatus.style.color = 'green';  // Excellent signal
+                    wifiSignalStatus.innerText = 'Excellent Signal';
+                } else if (rssiValue === "-50") {
+                    wifiSignalStatus.style.color = 'green';  // Excellent signal
+                    wifiSignalStatus.innerText = 'Excellent Signal';
+                } else if (rssiValue === "-60") {
+                    wifiSignalStatus.style.color = 'yellow';  // Good signal
+                    wifiSignalStatus.innerText = 'Good Signal';
+                } else if (rssiValue === "-70") {
+                    wifiSignalStatus.style.color = 'orange';  // Fair signal
+                    wifiSignalStatus.innerText = 'Fair Signal';
+                } else if (rssiValue === "-80") {
+                    wifiSignalStatus.style.color = 'red';  // Weak signal
+                    wifiSignalStatus.innerText = 'Weak Signal';
+                } else if (rssiValue === "-90") {
+                    wifiSignalStatus.style.color = 'darkred';  // Very weak signal
+                    wifiSignalStatus.innerText = 'Very Weak Signal';
+                } else {
+                    wifiSignalStatus.style.color = 'gray';  // No signal
+                    wifiSignalStatus.innerText = 'No Signal';
+                }
 
+                let zone1RelayStatusContent = zone1RelayStatus.innerText.trim();
+                let zone2RelayStatusContent = zone2RelayStatus.innerText.trim();
+                let zone3RelayStatusContent = zone3RelayStatus.innerText.trim();
+                let selectedZone = document.getElementById('zoneSelectorList').value;
+
+                if (zone1RelayStatusContent == 'Active' && selectedZone == '1'  ) {
+                     alert("Irrigation cannot be started as Zone 1 is currently active");
+                    event.preventDefault();
+                } else if (zone2RelayStatusContent == 'Active' && selectedZone == '2' ) {
+                     alert("Irrigation cannot be started as Zone 2 is currently active");
+                } else if (zone3RelayStatusContent == 'Active' && selectedZone == '3' ) {
+                     alert("Irrigation cannot be started as Zone 3 is currently active");
+                };
+
+            });
 
             zone1RelayController.addEventListener('click', () => {
 
@@ -531,7 +728,7 @@ window.onload = function () {
                 if (zone1RelayStatusContent == "Inactive") {
                     xhttp.open("GET", "zone/1/on", true);
                     zone1RelayController.setAttribute('data-state', 'on');
-                    zone1RelayStatus.style.color = "green";
+                    zone1RelayStatus.style.color = "#61e350";
                     zone1RelayController.style.backgroundColor = "red";
                     zone1RelayController.innerText = "Stop";
 
@@ -540,19 +737,15 @@ window.onload = function () {
                    zone1RelayController.setAttribute('data-state', 'off');
                    zone1RelayStatus.style.color = "red";
 
-                   zone1RelayController.style.backgroundColor = "green";
+                   zone1RelayController.style.backgroundColor = "#61e350";
                    zone1RelayController.innerText = "Start";
                 }
 
                 xhttp.send();
             });
 
-
-          
-
-          
-
-            zone2RelayController.addEventListener('click', () => {
+        
+        zone2RelayController.addEventListener('click', () => {
 
                 let xhttp = new XMLHttpRequest();
                 
@@ -561,7 +754,7 @@ window.onload = function () {
                 if (zone2RelayStatusContent == "Inactive") {
                     xhttp.open("GET", "zone/2/on", true);
                     zone2RelayController.setAttribute('data-state', 'on');
-                    zone2RelayStatus.style.color = "green";
+                    zone2RelayStatus.style.color = "#61e350";
                     zone2RelayController.style.backgroundColor = "red";
                     zone2RelayController.innerText = "Stop";
 
@@ -570,15 +763,12 @@ window.onload = function () {
                    zone2RelayController.setAttribute('data-state', 'off');
                    zone2RelayStatus.style.color = "red";
 
-                zone2RelayController.style.backgroundColor = "green";
+                zone2RelayController.style.backgroundColor = "#61e350";
                 zone2RelayController.innerText = "Start";
                 }
 
                 xhttp.send();
             });
-
-
-
 
             zone3RelayController.addEventListener('click', () => {
 
@@ -589,7 +779,7 @@ window.onload = function () {
                 if (zone3RelayStatusContent == "Inactive") {
                     xhttp.open("GET", "zone/3/on", true);
                     zone3RelayController.setAttribute('data-state', 'on');
-                    zone3RelayStatus.style.color = "green";
+                    zone3RelayStatus.style.color = "#61e350";
                     zone3RelayController.style.backgroundColor = "red";
                     zone3RelayController.innerText = "Stop";
 
@@ -598,7 +788,32 @@ window.onload = function () {
                    zone3RelayController.setAttribute('data-state', 'off');
                    zone3RelayStatus.style.color = "red";
 
-                   zone3RelayController.style.backgroundColor = "green";
+                   zone3RelayController.style.backgroundColor = "#61e350";
+                   zone3RelayController.innerText = "Start";
+                }
+
+                xhttp.send();
+            });
+
+            zone3RelayController.addEventListener('click', () => {
+
+                let xhttp = new XMLHttpRequest();
+                
+                let zone3RelayStatusContent = zone3RelayStatus.innerText.trim();
+
+                if (zone3RelayStatusContent == "Inactive") {
+                    xhttp.open("GET", "zone/3/on", true);
+                    zone3RelayController.setAttribute('data-state', 'on');
+                    zone3RelayStatus.style.color = "#61e350";
+                    zone3RelayController.style.backgroundColor = "red";
+                    zone3RelayController.innerText = "Stop";
+
+                } else {
+                   xhttp.open("GET", "zone/3/off", true);
+                   zone3RelayController.setAttribute('data-state', 'off');
+                   zone3RelayStatus.style.color = "red";
+
+                   zone3RelayController.style.backgroundColor = "#61e350";
                    zone3RelayController.innerText = "Start";
                 }
 
@@ -607,7 +822,27 @@ window.onload = function () {
 
 
 
-          
+
+    waterFillingController.addEventListener('click', () => {
+    let xhttp = new XMLHttpRequest();
+    let waterFillingControllerAttr = waterFillingController.getAttribute('data-state');
+
+    if (waterFillingControllerAttr === "off") {
+        xhttp.open("GET", "/waterfilling/on", true);
+        waterFillingController.setAttribute('data-state', 'on');
+        waterFillingController.style.backgroundColor = "red";
+        waterFillingController.innerText = "Disactivate";
+    } else {
+        xhttp.open("GET", "/waterfilling/off", true);
+        waterFillingController.setAttribute('data-state', 'off');
+        waterFillingController.style.backgroundColor = "#61e350";
+        waterFillingController.innerText = "Activate";
+    }
+
+    xhttp.send();
+});
+
+
             
 
 
@@ -626,7 +861,7 @@ window.onload = function () {
                 } else {
                    xhttp.open("GET", "alarm/disactivate", true);
                     alarmController.setAttribute('data-state', 'off');
-                    alarmController.style.backgroundColor = "green";
+                    alarmController.style.backgroundColor = "#61e350";
                     alarmController.innerText = "Activate";
 
                 }
@@ -694,6 +929,8 @@ setInterval(function () {
             xhttp.open("GET", "/rssi", true);
             xhttp.send();
 }, 3000);  
+
+
 
 
 setInterval(function ( ) {
@@ -773,14 +1010,18 @@ setInterval(function () {
 
  </script>
 
+
+
 </body>
 
 
 </html>
 
+
 )rawliteral";
 
 void setup_gpio_pins() {
+
   // Set GPIO pins for relays as output
   pinMode(RELY_1_PIN, OUTPUT);
   pinMode(RELY_2_PIN, OUTPUT);
@@ -803,9 +1044,11 @@ void setup_gpio_pins() {
 
   // Set GPIO pin for built-in LED as output
   pinMode(BUILT_IN_LED, OUTPUT);
+
 }
 
-void connectToWiFi() {
+void connectToWiFi() {  
+    
     WiFi.begin(wifi_ssid, wifi_pass);
     Serial.print("Connecting to WiFi");
     
@@ -814,13 +1057,14 @@ void connectToWiFi() {
         Serial.print("Connecting ...");
         wifi_status = "OFFLINE";
     }
-    
+
     Serial.println("\nConnected to WiFi");
     wifi_status = "ONLINE";
     wifi_rssi = String(WiFi.RSSI());  // Get the RSSI value
     wifi_ip = WiFi.localIP().toString();
 
     Serial.print(wifi_ip);
+
 }
 
 // Beep buzzer for water level alert
@@ -897,34 +1141,52 @@ String hundelRely4Status() {
     }
 };
 
-void hundelWaterFilling() {
-  if (AutoWaterFillingAllowed && WATER_LEVEL < 10) {
-    if (AlarmAllowed) {
-      beep_buzzer(3, 500);  // Trigger buzzer if water level is low
+ void hundelWaterFilling() {
+  // Only proceed if AutoWaterFilling is allowed
+  if (AutoWaterFillingAllowed) {
+    // If the water level is very low (below 10%)
+    if (WATER_LEVEL < 10) {
+      if (AlarmAllowed) {
+        beep_buzzer(3, 500);  // Trigger buzzer if water level is low
+      }
+      digitalWrite(RELY_4_PIN, LOW);  // Turn on water filling pump
     }
-    digitalWrite(RELY_4_PIN, LOW);
-  } else if (WATER_LEVEL > 30) {
-    digitalWrite(RELY_4_PIN, HIGH);
+    // If the water level is between 10% and 40%, ensure the pump is off
+    else if (WATER_LEVEL >= 10 && WATER_LEVEL <= 40) {
+      digitalWrite(RELY_4_PIN, HIGH);  // Turn off water filling pump
+    }
+    // If the water level is significantly high (above 40%), turn off the pump
+    else if (WATER_LEVEL > 40) {
+      digitalWrite(RELY_4_PIN, HIGH);  // Turn off water filling pump
+    }
+  }
+  // If AutoWaterFilling is disabled, ensure the pump is off
+  else {
+    digitalWrite(RELY_4_PIN, HIGH);  // Make sure the pump is off if AutoWaterFilling is disabled
   }
 }
 
+// -- RETURN WIFI SSID -- //
 String hundelSSID() {
   return String(wifi_ssid);
 };
 
+// -- RETURN WIFI RSSI -- //
 String hundelRSSI() {
   return String(wifi_rssi);
 };
 
+// -- ACTIVATE BUZZER ALARM -- //
 void activateBuzzerAlarm() {
     AlarmAllowed = true;
 };
 
+// -- DISACTIVATE BUZZER ALARM -- //
 void disactivateBuzzerAlarm() {
     AlarmAllowed = false;
 };
 
-
+// -- ACTIVATE BUZZER ALARM -- //
 void activateAutoWaterFilling() {
   AutoWaterFillingAllowed = true;
   digitalWrite(RELY_4_PIN, LOW);
@@ -943,7 +1205,6 @@ void turnOffZone1() {
   digitalWrite(RELY_1_PIN, HIGH);
 };
 
-
 void turnOnZone2() {
   digitalWrite(RELY_2_PIN, LOW);
 };
@@ -960,6 +1221,7 @@ void turnOnZone3() {
 void turnOffZone3() {
   digitalWrite(RELY_3_PIN, HIGH);
 };
+
 
 String hundelIP() {
   return String(wifi_ip);
@@ -1027,7 +1289,6 @@ void lcd_info_page() {
     lcd.setCursor(0, 1);
     lcd.print("IS OFFLINE :/");
   }
-  
 }
 
 // Welcome Page
@@ -1041,6 +1302,47 @@ void lcd_welcome_screen() {
   delay(4000);  // Wait for 4 seconds (4000 milliseconds)
 
   lcd.clear();  // Clear the screen after 4 seconds
+}
+
+// Function to display the active zones or home screen
+void lcd_active_zones() {
+  lcd.clear();  // Clear the screen
+
+  // Check if any zone is active (i.e., any relay is HIGH)
+  if (digitalRead(RELY_1_PIN) == HIGH || digitalRead(RELY_2_PIN) == HIGH || digitalRead(RELY_3_PIN) == HIGH) {
+    
+    // Check Zone 1 (RELY_1_PIN)
+    if (digitalRead(RELY_1_PIN) == HIGH) {
+      lcd.setCursor(0, 0);  // Set cursor to the first line, first column
+      lcd.print("Z1: ON");
+    } else {
+      lcd.setCursor(0, 0);  // Set cursor to the first line, first column
+      lcd.print("Z1: OFF");
+    }
+
+    // Check Zone 2 (RELY_2_PIN)
+    if (digitalRead(RELY_2_PIN) == HIGH) {
+      lcd.setCursor(0, 1);  // Set cursor to the second line, first column
+      lcd.print("Z2: ON");
+    } else {
+      lcd.setCursor(0, 1);  // Set cursor to the second line, first column
+      lcd.print("Z2: OFF");
+    }
+
+    // Check Zone 3 (RELY_3_PIN)
+    if (digitalRead(RELY_3_PIN) == HIGH) {
+      lcd.setCursor(8, 1);  // Set cursor to the second line, 8th column
+      lcd.print("Z3: ON");
+    } else {
+      lcd.setCursor(8, 1);  // Set cursor to the second line, 8th column
+      lcd.print("Z3: OFF");
+    }
+
+  } else {
+    // If no zone is active, show the home screen message
+    lcd.setCursor(0, 0);  // Set cursor to the first line, first column
+    lcd_info_page();
+  }
 }
 
 void setup() {
@@ -1058,7 +1360,7 @@ void setup() {
 
   // ROUTES 
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
-  request->send_P(200, "text/html", index_html, processor);
+  request->send_P(200, "text/html", dropwise_app, processor);
   });
 
 
@@ -1165,10 +1467,32 @@ void setup() {
   });
   
 
+  
+  server.on("/schedule_arrigation", HTTP_GET, [](AsyncWebServerRequest *request){
+    // Get 'zone' and 'duration' parameters from the GET request
+    String zone = request->getParam("zone")->value(); 
+    int duration = request->getParam("duration")->value().toInt(); // Convert duration to an integer
+      if (zone == "1") {
+          turnOnZone1();
+          delay(duration);
+          turnOffZone1();
+        } else if (zone == "2") {
+          turnOnZone2();
+          delay(duration);
+          turnOffZone2();
+        } else if (zone == "3") {
+          turnOnZone3();
+          delay(duration);
+          turnOffZone3();
+        } 
+});
+
+  
+  
+
   // Start server 
   server.begin();
 }
-
 
 void loop() {
   // Handle water level sensor and sensor readings
