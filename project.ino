@@ -1,4 +1,4 @@
-// DROPWISE APP | Made with love by Elayachi Hamrit 2025.
+// DROPWISE | Made with love by Elayachi Hamrit & Aziz Abd Elbassit 2025.
 
 // LIBS 
 // Includes the Wire library for I2C communication. Required for communication with I2C devices like sensors or displays.
@@ -57,6 +57,8 @@ String wifi_status;
 // Enable buzzer of it's true
 bool AlarmAllowed = true;
 
+bool isIrrigationActive = false;
+
 // Enable auto water filling of it's true!
 bool AutoWaterFillingAllowed = true;
 
@@ -84,6 +86,7 @@ int isZone3Active = false;
 int isWaterFillingActive = false;
 
 bool errorOnEV1 = false;
+bool errorOnEV2 = false;
 
 // Create web server object on port 80;
 AsyncWebServer server(80);
@@ -542,6 +545,7 @@ const char dropwise_app[] PROGMEM = R"rawliteral(
                 <div class="device-status">
                     <p class="device-name">Pump 1 <span style="color: #b5b4b4"> - Zone 1</span> </p>
                     <p id="rely1Status" class="status">{{R1_STATUS}}</p>
+                    <p id="ev_1_error" style="color: red;">[EV1_E]</p>  
                 </div>
 
                 <div class="device-status">
@@ -555,18 +559,7 @@ const char dropwise_app[] PROGMEM = R"rawliteral(
                 </div>
                 
 
-                <div class="device-status">
-                    <p class="device-name">Water Flow<span style="color: #b5b4b4"> - Sensor 1</span></p>
-                    <p id="wf_1_status" class="status">{{WF1_STATUS}}</p>
-                    <p id="ev_1_error" style="color: red;">[EV1_E]</p>
-                </div>
-                
-                <div class="device-status">
-                    <p class="device-name">Water Flow<span style="color: #b5b4b4"> - Sensor 2</span></p>
-                    <p id="wf_2_status" class="status">{{WF2_STATUS}}</p>
-                </div>
-                
-                
+    
 
                 <div class="device-status">
                     <p class="device-name">Water Filling </p>
@@ -576,6 +569,7 @@ const char dropwise_app[] PROGMEM = R"rawliteral(
                  <div class="device-status">
                     <p class="device-name">Default Motor</p>
                     <p id="irrigation_motor" class="status">[DEF_MOTOR]</p>
+                    <p id="ev_2_error" style="color: red;">[EV2_E]</p>
                 </div>
                 
             </div>
@@ -968,31 +962,6 @@ setInterval(function ( ) {
   var xhttp = new XMLHttpRequest();
   xhttp.onreadystatechange = function() {
     if (this.readyState == 4 && this.status == 200) {
-      document.getElementById("wf_1_status").innerHTML = this.responseText;
-    }
-  };
-  xhttp.open("GET", "/waterflowSensor/1/status", true);
-  xhttp.send();
-}, 2000 ) ;
-
-
-
-setInterval(function ( ) {
-  var xhttp = new XMLHttpRequest();
-  xhttp.onreadystatechange = function() {
-    if (this.readyState == 4 && this.status == 200) {
-      document.getElementById("wf_2_status").innerHTML = this.responseText;
-    }
-  };
-  xhttp.open("GET", "/waterflowSensor/2/status", true);
-  xhttp.send();
-}, 2000 ) ;
-
-
-setInterval(function ( ) {
-  var xhttp = new XMLHttpRequest();
-  xhttp.onreadystatechange = function() {
-    if (this.readyState == 4 && this.status == 200) {
       document.getElementById("humidity").innerHTML = this.responseText;
     }
   };
@@ -1119,6 +1088,18 @@ setInterval(function ( ) {
     }
   };
   xhttp.open("GET", "/error/ev/1", true);
+  xhttp.send();
+},5000 );
+
+
+setInterval(function ( ) {
+  var xhttp = new XMLHttpRequest();
+  xhttp.onreadystatechange = function() {
+    if (this.readyState == 4 && this.status == 200) {
+      document.getElementById("ev_2_error").innerHTML = this.responseText;
+    }
+  };
+  xhttp.open("GET", "/error/ev/2", true);
   xhttp.send();
 },5000 );
 
@@ -1285,13 +1266,13 @@ void hundelWaterFlowing() {
   int wf_sensore_2_status = digitalRead(WATER_FLOW_SENSORE_2);
 
   // Check if water is flowing
-  if (wf_sensore_1_status == LOW ) {  // Assuming LOW indicates water flow
+  if (wf_sensore_1_status == HIGH ) {  // Assuming LOW indicates water flow
     flowSensor1Status = true;
   } else {
     flowSensor1Status = false;
   }
 
-   if (wf_sensore_2_status == LOW) {  // Assuming LOW indicates water flow
+   if (wf_sensore_2_status == HIGH) {  // Assuming LOW indicates water flow
     flowSensor2Status = true; 
   } else {
     flowSensor2Status = false;
@@ -1319,7 +1300,19 @@ String waterFlow1SensorStatus() {
 
 String hundelEv1Error() {
   if (errorOnEV1 == true) {
-    return "Error Detected on EV1";
+    return "Error Detected on Zone 1 EV";
+  } else {
+    return "";
+  }
+}
+
+String hundelEv2Error() {
+  if (errorOnEV2 == true) {
+    if (defaultIrrigtionMotor == 18) {
+      return "Main Water Pump Error";
+    } else {
+      return "Secondary Water Pump Error";
+    }
   } else {
     return "";
   }
@@ -1484,6 +1477,16 @@ void turnOnZone2() {
 
 };
 
+void checkArrigationTasks() {
+  int motor1Status = digitalRead(18);
+  int motor2Status = digitalRead(19);
+  if (motor1Status == LOW || motor2Status == LOW) {
+    isIrrigationActive == true;
+  } else {
+    isIrrigationActive == false;
+  }
+}
+
 void checkSystemErrors() {
   unsigned long currentMillis = millis();  // Get the current time
 
@@ -1499,6 +1502,21 @@ void checkSystemErrors() {
       }
     } else {
       errorOnEV1 = false;                  // If Zone 1 is not active, no error
+    }
+
+    if (isIrrigationActive == true)  {
+      if (flowRate2  < MIN_FLOW_RATE) {
+        errorOnEV2 = true;  
+        if (defaultIrrigtionMotor == 18 ) {
+          digitalWrite(defaultIrrigtionMotor, HIGH);
+          digitalWrite(RELY_7_PIN, LOW);
+        } else {
+          digitalWrite(defaultIrrigtionMotor, LOW);
+          digitalWrite(RELY_7_PIN, HIGH);
+        }
+      } else {
+        errorOnEV2 = false;                 
+      }
     }
 
   }
@@ -1613,16 +1631,14 @@ String processor(const String& var){
     return hundelAutoWaterFillingStatus();
   } else if(var == "RAIN"){
     return RainStatus();
-  } else if(var == "WF1_STATUS"){
-    return waterFlow1SensorStatus();
-  } else if(var == "WF1_STATUS"){
-    return waterFlow2SensorStatus();
   } else if (var == "FLOW_R_1") {
     return flowRate1Status();
   } else if (var == "FLOW_R_2") {
     return flowRate2Status();
   } else if (var == "EV1_E") {
     return hundelEv1Error();
+  } else if (var == "EV2_E") {
+    return hundelEv2Error();
   } else if (var == "DEF_ARIG_MOTOR") {
     return hundelDefSelectedMotor();
   }
@@ -1878,20 +1894,16 @@ server.on("/error/ev/1", HTTP_GET, [](AsyncWebServerRequest *request){
     request->send_P(200, "text/plain", hundelEv1Error().c_str());
   });
 
+  server.on("/error/ev/2", HTTP_GET, [](AsyncWebServerRequest *request){
+    request->send_P(200, "text/plain", hundelEv2Error().c_str());
+  });
+
   server.on("/relay/3/status", HTTP_GET, [](AsyncWebServerRequest *request){
     request->send_P(200, "text/plain", hundelRely3Status().c_str());
   });
 
   server.on("/relay/4/status", HTTP_GET, [](AsyncWebServerRequest *request){
     request->send_P(200, "text/plain", hundelRely4Status().c_str());
-  });
-
-server.on("/waterflowSensor/1/status", HTTP_GET, [](AsyncWebServerRequest *request){
-    request->send_P(200, "text/plain", waterFlow1SensorStatus().c_str());
-  });
-
-server.on("/waterflowSensor/2/status", HTTP_GET, [](AsyncWebServerRequest *request){
-    request->send_P(200, "text/plain", waterFlow2SensorStatus().c_str());
   });
 
 
@@ -2005,7 +2017,10 @@ void loop() {
   hundelHumidity();
   updateDuckDNS();
   hundelWaterFilling();
-   
+   checkArrigationTasks();
   lcd_info_page();  // Update LCD with current info
   delay(1000);
   }
+
+
+  
